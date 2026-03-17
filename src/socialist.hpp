@@ -44,7 +44,7 @@ class Socialist{
     Socialist();
     ~Socialist();
 
-    void listen_sources(json const &input, string topic);
+    void listen(json const &input, string topic);
 
     /**
      * 

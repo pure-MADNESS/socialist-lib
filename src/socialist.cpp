@@ -11,7 +11,7 @@
 
 #include "socialist.hpp"
 
-void Socialist::listen_sources(json const &input, string topic){
+void Socialist::listen(json const &input, string topic){
 
 // if source node
   if(topic.rfind("source", 0) == 0){

@@ -51,7 +51,24 @@ class Socialist{
      * - residuals, for the negative ones check if this -> _strategy is the one with the lowest flexibilty for the given hour. If it is, shift it
      * 
      */
-    void update_strategy();
+    void update_strategy(); // funzione effettiva
+
+    // funzioni di supporto
+    void pop_totalPowers(); 
+    void pop_totalRequest();
+    void compute_residuals();
+
+    /*
+      _____ _   _ ___ 
+     |_   _| | | |_ _|
+       | | | | | || | 
+       | | | |_| || | 
+       |_|  \___/|___|
+                      
+    */
+    void clear_screen() { cout << "\033[2J\033[1;1H"; }
+    void display_tui(const vector<double>& powers, const vector<double>& flex, int cursor);
+    void run_planner_ui(vector<double>& powers, vector<double>& flex);
 
 
   private:

@@ -10,8 +10,16 @@ add_library(socialist STATIC
     src/socialist.hpp
 )
 
+include(FetchContent)
+FetchContent_Declare(
+  ftxui
+  GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
+  GIT_TAG v5.0.0 # O una versione più recente
+)
+FetchContent_MakeAvailable(ftxui)
+
 
 target_include_directories(socialist PUBLIC src)
 
 find_package(nlohmann_json QUIET)
-target_link_libraries(socialist PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(socialist PUBLIC nlohmann_json::nlohmann_json PRIVATE ftxui::screen ftxui::dom ftxui::component)

@@ -338,4 +338,4 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
     });
 
     screen.Loop(component);
-}}
+}

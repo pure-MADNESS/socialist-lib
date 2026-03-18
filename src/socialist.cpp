@@ -187,6 +187,14 @@ for(int h = 0; h < HOURS; h++){
 }
 
 
+void Socialist::add_noise(){
+
+  for(int i = 0; i < HOURS; i++){
+    _strategy._flex[i] += _dis(_gen);
+  }
+  
+}
+
 
 
 /*
@@ -198,11 +206,15 @@ for(int h = 0; h < HOURS; h++){
                   
 */
 
+
+
 void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
     using namespace ftxui;
 
     if (_strategy._requests.size() != 24) _strategy._requests.resize(24, 0.0);
     if (_strategy._flex.size() != 24) _strategy._flex.resize(24, 0.0);
+    
+    if (_is_manual.size() != 24) _is_manual.assign(24, false);
 
     auto screen = ScreenInteractive::Fullscreen();
     int cursor = 0;
@@ -211,17 +223,17 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
     bool is_editing_power = false;
     bool is_editing_flex = false;
 
-    // rendering
     auto renderer = Renderer([&] {
-        
         auto make_row = [&](int i) {
             bool is_selected = (i == cursor);
-            auto style = is_selected ? (bgcolor(Color::Blue) | bold | color(Color::White)) : nothing;
+            
+            auto manual_style = _is_manual[i] ? color(Color::Yellow) : nothing;
+            auto base_style = is_selected ? (bgcolor(Color::Blue) | bold | color(Color::White)) : manual_style;
             
             return hbox({
                 text(std::to_string(i) + ":00") | size(WIDTH, EQUAL, 6) | center | border,
-                text(std::to_string((int)_strategy._requests[i])) | size(WIDTH, EQUAL, 10) | center | border | style,
-                text(std::to_string((int)_strategy._flex[i])) | size(WIDTH, EQUAL, 10) | center | border | style,
+                text(std::to_string((int)_strategy._requests[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
+                text(std::to_string((int)_strategy._flex[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
             });
         };
 
@@ -257,7 +269,7 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
             }) | border;
         } else {
             footer = hbox({
-                text(" [Frecce]: MOVE | [E]: Edit Power | [F]: Edit Flex | [Q]: Quit "),
+                text(" [Frecce]: MOVE | [E]: Power | [F]: Flex | [Q]: Quit "),
                 ftxui::filler(),
                 text(global_running ? " GRID CONNECTED " : " OFFLINE ") 
                     | bgcolor(Color::Green) | color(Color::Black)
@@ -271,12 +283,13 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
         }) | border;
     });
 
-    // handler
     auto component = CatchEvent(renderer, [&](Event event) {
         
         if (is_editing_power || is_editing_flex) {
             if (event == Event::Return) {
                 double val = 0.0;
+                
+                // Logica di acquisizione valore
                 if (input_buffer.empty() && cursor > 0) {
                     val = is_editing_power ? _strategy._requests[cursor-1] : _strategy._flex[cursor-1];
                 } else if (!input_buffer.empty()) {
@@ -285,15 +298,13 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
 
                 if (is_editing_power) _strategy._requests[cursor] = val;
                 else _strategy._flex[cursor] = val;
-
+                
+                _is_manual[cursor] = true; 
+                _noise = false; 
                 for (int i = cursor + 1; i < 24; ++i) {
-                    if (is_editing_power) {
-                        if (_strategy._requests[i] == 0.0) _strategy._requests[i] = val;
-                        else break;
-                    } else {
-                        if (_strategy._flex[i] == 0.0) _strategy._flex[i] = val;
-                        else break;
-                    }
+                    if (_is_manual[i]) break; 
+                    if (is_editing_power) _strategy._requests[i] = val;
+                    else _strategy._flex[i] = val;
                 }
 
                 is_editing_power = is_editing_flex = false;
@@ -326,4 +337,9 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
     });
 
     screen.Loop(component);
+
+    if(!_noise){
+      _noise = true;
+      add_noise(); 
+    }
 }

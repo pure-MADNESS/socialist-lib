@@ -1,3 +1,4 @@
+
 /*
 
   ____             _       _ _     _          _               
@@ -19,6 +20,7 @@
 #include <chrono>
 #include <nlohmann/json.hpp>
 #include <atomic>
+#include <random>
 
 //tui
 #include <ftxui/dom/elements.hpp>
@@ -48,7 +50,7 @@ struct FuturePowers{
 class Socialist{
 
   public:
-    Socialist() {};
+    Socialist() : _gen(_rd()), _dis(0.1, 0.9) {}
     ~Socialist() {};
 
     void listen(json const &input, string topic);
@@ -64,6 +66,8 @@ class Socialist{
     void pop_totalPowers(); 
     void pop_totalRequest();
     void compute_residuals();
+
+    void add_noise();
 
     /*
       _____ _   _ ___ 
@@ -88,6 +92,12 @@ class Socialist{
     // _neightbors[1] -> first
     // _neighbours[1] -> second._requests // _flex
     map<string, FuturePowers> _powers;
+
+    bool _noise = false;
+    std::vector<bool> _is_manual = std::vector<bool>(24, false);
+    std::random_device _rd;
+    std::mt19937 _gen;
+    std::uniform_real_distribution<double> _dis;
 };
 
 

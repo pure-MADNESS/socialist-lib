@@ -205,7 +205,7 @@ for(int h = 0; h < HOURS; h++){
 void Socialist::display_tui(const vector<double>& powers, const vector<double>& flex, int cursor){
   
   std::cerr << "\033[H\033[J";
-  //clear_screen();
+  clear_screen();
   cerr << "=== PLANNER INTERFACE ===" << endl;
   cerr << "Commands: [w] up, [s] down, [e] edit, [q] save and exit" << endl;
   cerr << "NOTE: if the value [e] is empty, the previous value is taken." << endl;

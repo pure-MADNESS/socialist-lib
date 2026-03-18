@@ -22,4 +22,4 @@ FetchContent_MakeAvailable(ftxui)
 target_include_directories(socialist PUBLIC src)
 
 find_package(nlohmann_json QUIET)
-target_link_libraries(socialist PUBLIC nlohmann_json::nlohmann_json PRIVATE ftxui::screen ftxui::dom ftxui::component)
+target_link_libraries(socialist PUBLIC nlohmann_json::nlohmann_json ftxui::screen ftxui::dom ftxui::component)

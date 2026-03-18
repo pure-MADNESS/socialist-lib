@@ -227,7 +227,7 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
       auto header_legend = hbox({
       filler(),
       hbox({
-          text(" ORA ") | size(WIDTH, EQUAL, 6) | center | border,
+          text(" HOUR ") | size(WIDTH, EQUAL, 6) | center | border,
           separator(),
           text(" POW ") | size(WIDTH, EQUAL, 10) | center | border,
           separator(),
@@ -271,7 +271,7 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
             }) | border;
         } else {
             footer = hbox({
-                text(" [Frecce]: MOVE | [E]: Power | [F]: Flex | [Q]: Quit "),
+                text(" [ARROWS]: Move | [E]: Power | [F]: Flex | [Q]: Quit "),
                 ftxui::filler(),
                 text(global_running ? " GRID CONNECTED " : " OFFLINE ") 
                     | bgcolor(Color::Green) | color(Color::Black)

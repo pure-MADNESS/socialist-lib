@@ -204,20 +204,21 @@ for(int h = 0; h < HOURS; h++){
 
 void Socialist::display_tui(const vector<double>& powers, const vector<double>& flex, int cursor){
   
-  clear_screen();
-    cerr << "=== PLANNER INTERFACE ===" << endl;
-    cerr << "Commands: [w] up, [s] down, [e] edit, [q] save and exit" << endl;
-    cerr << "NOTE: if the value [e] is empty, the previous value is taken." << endl;
-    cerr << "-----------------------------------------------" << endl;
-    cerr << "  HOUR   |   POWER (W)   |   FLEXIBILITY'   " << endl;
-    cerr << "-----------------------------------------------" << endl;
+  std::cerr << "\033[H\033[J";
+  //clear_screen();
+  cerr << "=== PLANNER INTERFACE ===" << endl;
+  cerr << "Commands: [w] up, [s] down, [e] edit, [q] save and exit" << endl;
+  cerr << "NOTE: if the value [e] is empty, the previous value is taken." << endl;
+  cerr << "-----------------------------------------------" << endl;
+  cerr << "  HOUR   |   POWER (W)   |   FLEXIBILITY'   " << endl;
+  cerr << "-----------------------------------------------" << endl;
 
-    for (size_t i = 0; i < powers.size(); ++i) {
-        if (i == (size_t)cursor) cerr << " > "; else cerr << "   ";
-        cerr << setw(2) << i << ":00 | " 
-                  << setw(13) << powers[i] << " | " 
-                  << setw(15) << flex[i] << endl;
-    }
+  for (size_t i = 0; i < powers.size(); ++i) {
+      if (i == (size_t)cursor) cerr << " > "; else cerr << "   ";
+      cerr << setw(2) << i << ":00 | " 
+                << setw(13) << powers[i] << " | " 
+                << setw(15) << flex[i] << endl;
+  }
 
 }
 

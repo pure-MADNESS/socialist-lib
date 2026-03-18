@@ -221,7 +221,7 @@ void Socialist::display_tui(const vector<double>& powers, const vector<double>& 
 
 }
 
-void Socialist::run_planner_ui(){
+void Socialist::run_planner_ui(atomic<bool>& global_running){
 
   if (_strategy._requests.size() != 24){
     _strategy._requests.resize(24, 0.0);
@@ -235,7 +235,7 @@ void Socialist::run_planner_ui(){
   string input_str;
   char choice;
 
-  while (true) {
+  while (global_running) {
       display_tui(_strategy._requests, _strategy._flex, cursor);
       cerr << "\nCommand: ";
       cin >> choice;

@@ -18,6 +18,7 @@
 #include <array>
 #include <chrono>
 #include <nlohmann/json.hpp>
+#include <atomic>
 
 #define HOURS 24
 
@@ -68,7 +69,7 @@ class Socialist{
     */
     void clear_screen() { cout << "\033[2J\033[1;1H"; }
     void display_tui(const vector<double>& powers, const vector<double>& flex, int cursor);
-    void run_planner_ui();
+    void run_planner_ui(atomic<bool>& global_running);
 
 
   private:

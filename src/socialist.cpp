@@ -279,7 +279,7 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
         }
 
         return vbox({
-            text(" SOCIALIST PLANNER INTERFACE ") | center | bold | borderDouble,
+            text(" PLANNER INTERFACE ") | center | bold | borderDouble,
             vbox(std::move(rows)) | vscroll_indicator | frame | flex,
             footer
         }) | border;

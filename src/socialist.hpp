@@ -41,8 +41,8 @@ struct FuturePowers{
 class Socialist{
 
   public:
-    Socialist();
-    ~Socialist();
+    Socialist() {};
+    ~Socialist() {};
 
     void listen(json const &input, string topic);
 

@@ -221,117 +221,105 @@ void Socialist::display_tui(const vector<double>& powers, const vector<double>& 
   }
 
 }
-
 void Socialist::run_planner_ui(atomic<bool>& global_running) {
     using namespace ftxui;
 
-    // Assicuriamoci che i vettori abbiano la dimensione corretta
     if (_strategy._requests.size() != 24) _strategy._requests.resize(24, 0.0);
     if (_strategy._flex.size() != 24) _strategy._flex.resize(24, 0.0);
 
     auto screen = ScreenInteractive::Fullscreen();
     int cursor = 0;
     
-    // Variabili di stato per l'editing
     std::string input_buffer;
     bool is_editing_power = false;
     bool is_editing_flex = false;
 
-    // Componente di Rendering (Disegna l'interfaccia)
     auto renderer = Renderer([&] {
-        Elements rows;
-        
-        // Header
-        rows.push_back(hbox({
-            text(" ORA ") | size(WIDTH, EQUAL, 8) | border,
-            text(" POTENZA (W) ") | flex | border,
-            text(" FLESSIBILITA' ") | flex | border,
-        }) | bold | color(Color::Yellow));
-
-        // Tabella
-        for (int i = 0; i < 24; ++i) {
+        auto make_row = [&](int i) {
             bool is_selected = (i == cursor);
             auto row_style = is_selected ? (bgcolor(Color::Blue) | bold) : nothing;
             
-            rows.push_back(hbox({
-                text(std::to_string(i) + ":00") | size(WIDTH, EQUAL, 8) | center | border,
+            return hbox({
+                text(std::to_string(i) + ":00") | size(WIDTH, EQUAL, 6) | center | border,
                 text(std::to_string((int)_strategy._requests[i])) | flex | center | border | row_style,
                 text(std::to_string((int)_strategy._flex[i])) | flex | center | border | row_style,
-            }));
-        }
+            });
+        };
 
-        // Barra di stato / Input dinamico
+        // columns
+        Elements left_column;
+        Elements right_column;
+
+        // headers
+        auto header = hbox({
+            text(" ORA ") | size(WIDTH, EQUAL, 6) | border,
+            text(" POW ") | flex | border,
+            text(" FLEX ") | flex | border,
+        }) | bold | color(Color::Yellow);
+
+        left_column.push_back(header);
+        right_column.push_back(header);
+
+        for (int i = 0; i < 12; ++i) left_column.push_back(make_row(i));
+        for (int i = 12; i < 24; ++i) right_column.push_back(make_row(i));
+
+        auto table_layout = hbox({
+            vbox(std::move(left_column)) | flex,
+            separator(),
+            vbox(std::move(right_column)) | flex,
+        });
+
         Element footer;
         if (is_editing_power || is_editing_flex) {
-            std::string prompt = is_editing_power ? " EDIT POTENZA [H-" + std::to_string(cursor) + "]: " 
+            std::string prompt = is_editing_power ? " EDIT POWER [H-" + std::to_string(cursor) + "]: " 
                                                  : " EDIT FLEX [H-" + std::to_string(cursor) + "]: ";
             footer = hbox({
                 text(prompt) | bold | color(Color::Cyan),
                 text(input_buffer) | color(Color::White) | blink,
-                ftxui::filler() // Riempie il resto della riga
+                filler() 
             }) | border;
         } else {
             footer = hbox({
-                text(" [Frecce]: Muovi | [E]: Modifica Potenza | [F]: Modifica Flex | [Q]: Esci "),
-                ftxui::filler(),
+                text(" [Arrows]: MOVE | [E]: Edit Power | [F]: Edit Flex | [Q]: Quit "),
+                filler(),
                 text(global_running ? " GRID CONNECTED " : " OFFLINE ") | bgcolor(Color::Green) | color(Color::Black)
             }) | border;
         }
 
         return vbox({
             text(" PLANNER INTERFACE ") | center | bold | borderDouble,
-            vbox(std::move(rows)) | vscroll_indicator | frame | flex,
+            table_layout | flex,
             footer
         }) | border;
     });
 
-    // Gestore Eventi (Cattura i tasti)
     auto component = CatchEvent(renderer, [&](Event event) {
-        
-        // LOGICA DI EDITING (Se stiamo scrivendo un numero)
         if (is_editing_power || is_editing_flex) {
-            // Conferma con INVIO
+   
             if (event == Event::Return) {
                 if (input_buffer.empty() && cursor > 0) {
-                    // Copia valore ora precedente
                     if (is_editing_power) _strategy._requests[cursor] = _strategy._requests[cursor - 1];
                     else _strategy._flex[cursor] = _strategy._flex[cursor - 1];
                 } else if (!input_buffer.empty()) {
                     try {
                         if (is_editing_power) _strategy._requests[cursor] = std::stod(input_buffer);
                         else _strategy._flex[cursor] = std::stod(input_buffer);
-                    } catch (...) {} // Ignora input non validi
+                    } catch (...) {}
                 }
                 input_buffer = "";
                 is_editing_power = is_editing_flex = false;
                 return true;
             }
-            
-            // Annulla con ESC
-            if (event == Event::Escape) {
-                input_buffer = "";
-                is_editing_power = is_editing_flex = false;
-                return true;
-            }
-
-            // Backspace per cancellare
-            if (event == Event::Backspace) {
-                if (!input_buffer.empty()) input_buffer.pop_back();
-                return true;
-            }
-
-            // Inserimento numeri e punto decimale
+            if (event == Event::Escape) { is_editing_power = is_editing_flex = false; return true; }
+            if (event == Event::Backspace) { if (!input_buffer.empty()) input_buffer.pop_back(); return true; }
             if (event.is_character()) {
                 char c = event.character()[0];
-                if (std::isdigit(c) || c == '.') {
-                    input_buffer += c;
-                }
+                if (std::isdigit(c) || c == '.') input_buffer += c;
                 return true;
             }
-            return true; // Blocca altri tasti mentre editi
+            return true;
         }
 
-        // LOGICA DI NAVIGAZIONE (Modo normale)
         if (event == Event::Character('q')) {
             screen.ExitLoopClosure()();
             global_running = false;
@@ -340,6 +328,8 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
 
         if (event == Event::ArrowUp)   { cursor = std::max(0, cursor - 1); return true; }
         if (event == Event::ArrowDown) { cursor = std::min(23, cursor + 1); return true; }
+        if (event == Event::ArrowRight) { if (cursor < 12) cursor += 12; return true; }
+        if (event == Event::ArrowLeft)  { if (cursor >= 12) cursor -= 12; return true; }
         
         if (event == Event::Character('e')) { is_editing_power = true; input_buffer = ""; return true; }
         if (event == Event::Character('f')) { is_editing_flex = true; input_buffer = ""; return true; }
@@ -348,4 +338,4 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
     });
 
     screen.Loop(component);
-}
+}}

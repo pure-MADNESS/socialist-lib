@@ -224,39 +224,41 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
     bool is_editing_flex = false;
 
     auto renderer = Renderer([&] {
-        auto make_row = [&](int i) {
-            bool is_selected = (i == cursor);
-            
-            auto manual_style = _is_manual[i] ? color(Color::Yellow) : nothing;
-            auto base_style = is_selected ? (bgcolor(Color::Blue) | bold | color(Color::White)) : manual_style;
-            
-            return hbox({
-                text(std::to_string(i) + ":00") | size(WIDTH, EQUAL, 6) | center | border,
-                text(std::to_string((int)_strategy._requests[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
-                text(std::to_string((int)_strategy._flex[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
-            });
-        };
+      auto header_legend = hbox({
+      filler(),
+      hbox({
+          text(" ORA ") | size(WIDTH, EQUAL, 6) | center | border,
+          separator(),
+          text(" POW ") | size(WIDTH, EQUAL, 10) | center | border,
+          separator(),
+          text(" FLEX ") | size(WIDTH, EQUAL, 10) | center | border,
+        }) | bold | color(Color::Yellow),
+        filler(),
+      });
 
-        auto header = hbox({
-            text(" ORA ") | size(WIDTH, EQUAL, 6) | center | border,
-            text(" POW ") | size(WIDTH, EQUAL, 10) | center | border,
-            text(" FLEX ") | size(WIDTH, EQUAL, 10) | center | border,
-        }) | bold | color(Color::Yellow);
+      auto make_row = [&](int i) {
+          bool is_selected = (i == cursor);
+          auto manual_style = _is_manual[i] ? color(Color::Yellow) : nothing;
+          auto base_style = is_selected ? (bgcolor(Color::Blue) | bold | color(Color::White)) : manual_style;
+          
+          return hbox({
+              text(std::to_string(i) + ":00") | size(WIDTH, EQUAL, 6) | center | border,
+              text(std::to_string((int)_strategy._requests[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
+              text(std::to_string((int)_strategy._flex[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
+          });
+      };
 
-        Elements left_col, right_col;
-        left_col.push_back(header);
-        right_col.push_back(header);
+      Elements left_col, right_col;
+      for (int i = 0; i < 12; ++i) left_col.push_back(make_row(i));
+      for (int i = 12; i < 24; ++i) right_col.push_back(make_row(i));
 
-        for (int i = 0; i < 12; ++i) left_col.push_back(make_row(i));
-        for (int i = 12; i < 24; ++i) right_col.push_back(make_row(i));
-
-        auto table_layout = hbox({
-            filler(),
-            vbox(std::move(left_col)),
-            separator(),
-            vbox(std::move(right_col)),
-            filler(),
-        });
+      auto table_layout = hbox({
+          filler(),
+          vbox(std::move(left_col)),
+          separator(),
+          vbox(std::move(right_col)),
+          filler(),
+      });
 
         Element footer;
         if (is_editing_power || is_editing_flex) {
@@ -277,9 +279,7 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
         }
 
         return vbox({
-            text(" SOCIALIST PLANNER INTERFACE ") | center | bold | borderDouble,
-            table_layout | flex,
-            footer
+        text(" PLANNER INTERFACE ") | center | bold | borderDouble, header_legend, table_layout | flex, footer
         }) | border;
     });
 

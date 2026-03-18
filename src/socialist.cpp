@@ -268,12 +268,12 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
             footer = hbox({
                 text(prompt) | bold | color(Color::Cyan),
                 text(input_buffer) | color(Color::White) | blink,
-                fill() // Riempie il resto della riga
+                ftxui::fill() // Riempie il resto della riga
             }) | border;
         } else {
             footer = hbox({
                 text(" [Frecce]: Muovi | [E]: Modifica Potenza | [F]: Modifica Flex | [Q]: Esci "),
-                fill(),
+                ftxui::fill(),
                 text(global_running ? " GRID CONNECTED " : " OFFLINE ") | bgcolor(Color::Green) | color(Color::Black)
             }) | border;
         }

@@ -68,7 +68,7 @@ class Socialist{
     */
     void clear_screen() { cout << "\033[2J\033[1;1H"; }
     void display_tui(const vector<double>& powers, const vector<double>& flex, int cursor);
-    void run_planner_ui(vector<double>& powers, vector<double>& flex);
+    void run_planner_ui();
 
 
   private:

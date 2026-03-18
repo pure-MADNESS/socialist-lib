@@ -221,14 +221,14 @@ void Socialist::display_tui(const vector<double>& powers, const vector<double>& 
 
 }
 
-void Socialist::run_planner_ui(vector<double>& powers, vector<double>& flex){
+void Socialist::run_planner_ui(){
 
-  if (powers.size() != 24){
-    powers.resize(24, 0.0);
+  if (_strategy._requests.size() != 24){
+    _strategy._requests.resize(24, 0.0);
   }
 
-  if (flex.size() != 24){
-    flex.resize(24, 0.0);
+  if (_strategy._flex.size() != 24){
+    _strategy._flex.resize(24, 0.0);
   }
 
   int cursor = 0;
@@ -236,7 +236,7 @@ void Socialist::run_planner_ui(vector<double>& powers, vector<double>& flex){
   char choice;
 
   while (true) {
-      display_tui(powers, flex, cursor);
+      display_tui(_strategy._requests, _strategy._flex, cursor);
       cerr << "\nCommand: ";
       cin >> choice;
       cin.ignore();
@@ -253,10 +253,10 @@ void Socialist::run_planner_ui(vector<double>& powers, vector<double>& flex){
               getline(cin, input_str);
 
               if (input_str.empty() && cursor > 0) {
-                  powers[cursor] = powers[cursor - 1];
+                  _strategy._requests[cursor] = _strategy._requests[cursor - 1];
 
               } else if (!input_str.empty()) {
-                  powers[cursor] = stod(input_str);
+                  _strategy._requests[cursor] = stod(input_str);
 
               }
 
@@ -265,10 +265,10 @@ void Socialist::run_planner_ui(vector<double>& powers, vector<double>& flex){
               getline(cin, input_str);
 
               if (input_str.empty() && cursor > 0) {
-                  flex[cursor] = flex[cursor - 1];
+                  _strategy._flex[cursor] = _strategy._flex[cursor - 1];
 
               } else if (!input_str.empty()) {
-                  flex[cursor] = stod(input_str);
+                  _strategy._flex[cursor] = stod(input_str);
 
               }
               break;

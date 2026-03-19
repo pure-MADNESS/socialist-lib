@@ -186,6 +186,15 @@ for(int h = 0; h < HOURS; h++){
   }
 }
 
+double Socialist::get_current_request(){
+
+  auto now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+  tm* local_tm = std::localtime(&now_time_t);
+  int current_hour = local_tm->tm_hour;
+
+  return _strategy._requests[current_hour];  
+}
+
 
 void Socialist::add_noise(){
 

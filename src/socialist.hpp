@@ -67,6 +67,9 @@ class Socialist{
     void pop_totalRequest();
     void compute_residuals();
 
+    double get_current_request();
+    vector<double> get_all_requests() const {return _strategy._requests; }
+    vector<double> get_all_flex() const { return _strategy._flex; }
     void add_noise();
 
     /*
@@ -98,6 +101,8 @@ class Socialist{
     std::random_device _rd;
     std::mt19937 _gen;
     std::uniform_real_distribution<double> _dis;
+
+    double _current_request = 0.0;
 };
 
 

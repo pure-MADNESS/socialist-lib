@@ -21,6 +21,7 @@
 #include <nlohmann/json.hpp>
 #include <atomic>
 #include <random>
+#include <mutex>
 
 //tui
 #include <ftxui/dom/elements.hpp>
@@ -68,8 +69,13 @@ class Socialist{
     void compute_residuals();
 
     double get_current_request();
-    vector<double> get_all_requests() const {return _strategy._requests; }
-    vector<double> get_all_flex() const { return _strategy._flex; }
+    vector<double> get_all_requests() const {
+      lock_guard<mutex> lock(const_cast<mutex&>(_data_mutex));
+      return _strategy._requests;
+    }
+    vector<double> get_all_flex() const { 
+      lock_guard<mutex> lock(const_cast<mutex&>(_data_mutex));
+      return _strategy._flex; }
     void add_noise();
 
     /*
@@ -103,6 +109,8 @@ class Socialist{
     std::uniform_real_distribution<double> _dis;
 
     double _current_request = 0.0;
+
+    mutex _data_mutex;
 };
 
 

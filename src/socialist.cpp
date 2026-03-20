@@ -188,9 +188,12 @@ for(int h = 0; h < HOURS; h++){
 
 double Socialist::get_current_request(){
 
-  auto now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-  tm* local_tm = std::localtime(&now_time_t);
-  int current_hour = local_tm->tm_hour;
+  lock_guard<mutex> lock(_data_mutex);
+
+  auto now_time_t = chrono::system_clock::to_time_t(chrono::system_clock::now());
+  tm local_tm;
+  localtime_r(&now_time_t, &local_tm);
+  int current_hour = local_tm.tm_hour;
 
   return _strategy._requests[current_hour];  
 }
@@ -304,6 +307,8 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
                 } else if (!input_buffer.empty()) {
                     try { val = std::stod(input_buffer); } catch(...) { return true; }
                 }
+
+                lock_guard<mutex> lock(_data_mutex);
 
                 if (is_editing_power) _strategy._requests[cursor] = val;
                 else _strategy._flex[cursor] = val;

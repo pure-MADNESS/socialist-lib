@@ -13,6 +13,8 @@
 
 void Socialist::listen(json const &input, string topic){
 
+  lock_guard<mutex> lock(_data_mutex);
+
 // if source node
   if(topic.rfind("source", 0) == 0){
 
@@ -108,82 +110,84 @@ void Socialist::compute_residuals(){
 
 void Socialist::update_strategy(){
 
-pop_totalPowers();
-pop_totalRequest();
-compute_residuals();
+  lock_guard<mutex> lock(_data_mutex);
 
-vector<double> neighbours_flex(HOURS, 0.0);
-double total_deficit_before = 0.0;
+  pop_totalPowers();
+  pop_totalRequest();
+  compute_residuals();
 
-  // Calcola il deficit totale prima di qualsiasi shift
-for(int h = 0; h < HOURS; h++){
-  if(_residuals[h] < 0) total_deficit_before -= _residuals[h];
-}
+  vector<double> neighbours_flex(HOURS, 0.0);
+  double total_deficit_before = 0.0;
 
-
- //INIZIO CICLO DI CONTROLLO PER OGNI ORA
-for(int h = 0; h < HOURS; h++){
-
-  // Se il margine è negativo, cerco di shiftare
-    if(_residuals[h] < 0){
-
-        double max_flex = numeric_limits<double>::lowest();
-
-        for(const auto& [name,Strategy] : _neighbours){
-
-          if(Strategy._flex[h] > max_flex){
-            max_flex = Strategy._flex[h];
-          }
-        }
-        neighbours_flex[h] = max_flex;
-      
+    // Calcola il deficit totale prima di qualsiasi shift
+  for(int h = 0; h < HOURS; h++){
+    if(_residuals[h] < 0) total_deficit_before -= _residuals[h];
+  }
 
 
-    // CONTROLLO SE SONO IL PIU FLESSIBILE
-      if(_strategy._flex[h] > neighbours_flex[h] ){
-          
-        // funzione di shifting
-        double full_request = _strategy._requests[h];  
-        double window = _strategy._flex[h];           
-        int start = std::max(0, h - (int)window);
-        int end = std::min(HOURS, h + (int)window + 1);
-      
-        // Trova MIGLIORE ora nella finestra (residual PIÙ positivo)
-        int best_hour = h;
-        double best_score = -1e9;
+  //INIZIO CICLO DI CONTROLLO PER OGNI ORA
+  for(int h = 0; h < HOURS; h++){
 
-        // check the highest residual slot
-        for(int nh = start; nh < end; nh++){
-          double score = _residuals[nh]; 
-          if(score > best_score){
-              best_score = score;
-              best_hour = nh;
-          }
-        }
-      
-        // ALL-OR-NOTHING: sposta tutta la task in uno slot migliore
-        if(best_hour != h){  // Solo se diverso dall'originale
-            _strategy._requests[best_hour] += full_request;
-            _strategy._requests[h] -= full_request;  // SPEGNE qui
-        }
-        
-        _strategy._last_active = steady_clock::now();
+    // Se il margine è negativo, cerco di shiftare
+      if(_residuals[h] < 0){
 
-        double total_deficit_now = 0.0;
-        for(int i = 0; i < HOURS; i++) {
-            if(_residuals[i] < 0){
-              total_deficit_now -= _residuals[i];
+          double max_flex = numeric_limits<double>::lowest();
+
+          for(const auto& [name,Strategy] : _neighbours){
+
+            if(Strategy._flex[h] > max_flex){
+              max_flex = Strategy._flex[h];
             }
-        }
+          }
+          neighbours_flex[h] = max_flex;
         
-        // CONTROLLO DI CONVEREGENZA: se il deficit totale non è migliorato di almeno il 5%
-        if(total_deficit_now > total_deficit_before * 0.95 || total_deficit_now < 10.0) {
-            break;  // Esce dal ciclo for(h)!
+
+
+      // CONTROLLO SE SONO IL PIU FLESSIBILE
+        if(_strategy._flex[h] > neighbours_flex[h] ){
+            
+          // funzione di shifting
+          double full_request = _strategy._requests[h];  
+          double window = _strategy._flex[h];           
+          int start = std::max(0, h - (int)window);
+          int end = std::min(HOURS, h + (int)window + 1);
+        
+          // Trova MIGLIORE ora nella finestra (residual PIÙ positivo)
+          int best_hour = h;
+          double best_score = -1e9;
+
+          // check the highest residual slot
+          for(int nh = start; nh < end; nh++){
+            double score = _residuals[nh]; 
+            if(score > best_score){
+                best_score = score;
+                best_hour = nh;
+            }
+          }
+        
+          // ALL-OR-NOTHING: sposta tutta la task in uno slot migliore
+          if(best_hour != h){  // Solo se diverso dall'originale
+              _strategy._requests[best_hour] += full_request;
+              _strategy._requests[h] -= full_request;  // SPEGNE qui
+          }
+          
+          _strategy._last_active = steady_clock::now();
+
+          double total_deficit_now = 0.0;
+          for(int i = 0; i < HOURS; i++) {
+              if(_residuals[i] < 0){
+                total_deficit_now -= _residuals[i];
+              }
+          }
+          
+          // CONTROLLO DI CONVEREGENZA: se il deficit totale non è migliorato di almeno il 5%
+          if(total_deficit_now > total_deficit_before * 0.95 || total_deficit_now < 10.0) {
+              break;  // Esce dal ciclo for(h)!
+          }
         }
       }
-    }
 
-  }
+    }
 }
 
 double Socialist::get_current_request(){
@@ -236,6 +240,7 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
     bool is_editing_flex = false;
 
     auto renderer = Renderer([&] {
+      lock_guard<mutex> lock(_data_mutex);
       auto header_legend = hbox({
       filler(),
       hbox({

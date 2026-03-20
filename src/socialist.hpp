@@ -51,7 +51,13 @@ struct FuturePowers{
 class Socialist{
 
   public:
-    Socialist() : _gen(_rd()), _dis(0.1, 0.9) {}
+    Socialist() : _gen(_rd()), _dis(0.1, 0.9) {
+      _strategy._requests.assign(HOURS, 0.0);
+      _strategy._flex.assign(HOURS, 0.0);
+      _tot_powers.assign(HOURS, 0.0);
+      _residuals.assign(HOURS, 0.0);
+    }
+    
     ~Socialist() {};
 
     void listen(json const &input, string topic);

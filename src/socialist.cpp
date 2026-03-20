@@ -16,60 +16,73 @@ void Socialist::listen(json const &input, string topic){
   lock_guard<mutex> lock(_data_mutex);
 
 // if source node
-  if(topic.rfind("source", 0) == 0){
+  try{
+    if(topic.rfind("source", 0) == 0){
 
-    auto iter_sources = _powers.find(topic);
-    if(input.contains("hourly")){
-      
-      auto const& json_array = input.at("hourly");
-
-      if(iter_sources != _powers.end()){
-        for(int i = 0; i < HOURS; ++i){
-          iter_sources -> second._powers[i] = json_array.at(i).get<double>();
-        }
-      } else {
-
-        FuturePowers new_hourly;
-
-        for(size_t i = 0; i < HOURS; ++i){
-          new_hourly._powers[i] = json_array.at(i).get<double>();
-        }
-        _powers[topic] = new_hourly;
+      auto iter_sources = _powers.find(topic);
+      if (iter_sources._powers.size() != HOURS) {
+        iter_sources._powers.assign(HOURS, 0.0);
       }
-    }
 
-  // if load node
-  } else if(topic.rfind("load", 0) == 0){
+      if(input.contains("hourly")){
+        
+        auto const& json_array = input.at("hourly");
 
-    auto iter_loads = _neighbours.find(topic);
-    auto now = steady_clock::now();
+        if(iter_sources != _powers.end()){
+          for(int i = 0; i < HOURS; ++i){
+            iter_sources -> second._powers[i] = json_array.at(i).get<double>();
+          }
+        } else {
 
-    if(iter_loads != _neighbours.end() && input.contains("hourly")){
+          FuturePowers new_hourly;
 
-      auto const& json_array = input.at("hourly");
-
-      for(int i = 0; i < HOURS; i++){
-        iter_loads -> second._requests[i] = json_array.at("requests").at(i).get<double>();
-        iter_loads -> second._flex[i] = json_array.at("flexibilities").at(i).get<double>();
+          for(size_t i = 0; i < HOURS; ++i){
+            new_hourly._powers[i] = json_array.at(i).get<double>();
+          }
+          _powers[topic] = new_hourly;
+        }
       }
+
+    // if load node
+    } else if(topic.rfind("load", 0) == 0){
+
+      auto iter_loads = _neighbours.find(topic);
+
+      if (iter_loads._requests.size() != HOURS) iter_loads._requests.assign(HOURS, 0.0);
+      if (iter_loads._flex.size() != HOURS) iter_loads._flex.assign(HOURS, 0.0);
+
+      auto now = steady_clock::now();
+
+      if(iter_loads != _neighbours.end() && input.contains("hourly")){
+
+        auto const& json_array = input.at("hourly");
+
+        for(int i = 0; i < HOURS; i++){
+          iter_loads -> second._requests[i] = json_array.at("requests").at(i).get<double>();
+          iter_loads -> second._flex[i] = json_array.at("flexibilities").at(i).get<double>();
+        }
+        
+      } else{
+
+        Strategy new_load;
+
+        auto const& json_array = input.at("hourly");
+        
+        for(int i = 0; i < HOURS; i++){
+          new_load._requests[i] = json_array.at("requests").at(i).get<double>();
+          new_load._flex[i] = json_array.at("flexibilities").at(i).get<double>();
+        }
       
+        _neighbours[topic] = new_load;
+      }
+
     } else{
 
-      Strategy new_load;
-
-      auto const& json_array = input.at("hourly");
-      
-      for(int i = 0; i < HOURS; i++){
-        new_load._requests[i] = json_array.at("requests").at(i).get<double>();
-        new_load._flex[i] = json_array.at("flexibilities").at(i).get<double>();
-      }
-    
-      _neighbours[topic] = new_load;
+      return;
     }
-
-  } else{
-
-    return;
+  
+  } catch (const std::exception& e) {
+    std::cerr << "[Socialist] JSON parsing error on topic " << topic << ": " << e.what() << std::endl;
   }
   
 }

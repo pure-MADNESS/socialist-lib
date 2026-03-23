@@ -303,7 +303,7 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
     for (int i = 12; i < 24; ++i) right_col.push_back(make_row(i));
     
     auto table_layout = hbox({
-      filler(), vbox(move(left_col)), separator(), vbox(move(right_col)), filler(),
+      filler(), vbox(std::move(left_col)), separator(), vbox(std::move(right_col)), filler(),
     });
 
     Element footer;
@@ -400,7 +400,7 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
     if (event == Event::ArrowLeft)  { if (cursor >= 12) cursor = max(current_hour, cursor - 12); return true; }
     return false;
   });
-  
+
   screen.Loop(component);
   if(!_noise){ _noise = true; add_noise(); }
 }

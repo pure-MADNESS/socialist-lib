@@ -39,6 +39,7 @@ struct Strategy{
 
   vector<double> _requests;
   vector<double> _flex;
+  vector<int> _durations;
   steady_clock::time_point _last_active; 
 };
 

@@ -99,6 +99,12 @@ void Socialist::update_strategy(){
   pop_totalRequest();
   compute_residuals();
 
+
+  auto now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+  tm* local_tm = std::localtime(&now_time_t);
+  int current_hour = local_tm->tm_hour;
+  int next_hour = current_hour + 1;
+
   vector<double> neighbours_flex(HOURS, 0.0);
   double total_deficit_before = 0.0;
 
@@ -127,12 +133,12 @@ void Socialist::update_strategy(){
 
 
       // CONTROLLO SE SONO IL PIU FLESSIBILE
-        if(_strategy._flex[h] > neighbours_flex[h] ){
+        if(_strategy._flex[h] > neighbours_flex[h] && h > next_hour ){
             
           // funzione di shifting
           double full_request = _strategy._requests[h];  
           double window = _strategy._flex[h];           
-          int start = std::max(0, h - (int)window);
+          int start = std::max(next_hour + 1, h - (int)window);
           int end = std::min(HOURS, h + (int)window + 1);
         
           // Trova MIGLIORE ora nella finestra (residual PIÙ positivo)
@@ -207,63 +213,84 @@ void Socialist::add_noise(){
 
 
 
-void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
+void Socialist::run_planner_ui(atomic<bool>& global_running) {
     using namespace ftxui;
 
     if (_strategy._requests.size() != 24) _strategy._requests.resize(24, 0.0);
     if (_strategy._flex.size() != 24) _strategy._flex.resize(24, 0.0);
-    
     if (_is_manual.size() != 24) _is_manual.assign(24, false);
 
+    auto get_now_hour = []() {
+        auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+        return localtime(&now)->tm_hour;
+    };
+
     auto screen = ScreenInteractive::Fullscreen();
-    int cursor = 0;
+    int cursor = get_now_hour();
     
-    std::string input_buffer;
+    string input_buffer;
     bool is_editing_power = false;
     bool is_editing_flex = false;
 
     auto renderer = Renderer([&] {
-      lock_guard<mutex> lock(_data_mutex);
-      auto header_legend = hbox({
-      filler(),
-      hbox({
-          text(" HOUR ") | size(WIDTH, EQUAL, 6) | center | border,
-          separator(),
-          text(" POW ") | size(WIDTH, EQUAL, 10) | center | border,
-          separator(),
-          text(" FLEX ") | size(WIDTH, EQUAL, 10) | center | border,
-        }) | bold | color(Color::Yellow),
-        filler(),
-      });
+        int current_hour = get_now_hour();
+        lock_guard<mutex> lock(_data_mutex);
 
-      auto make_row = [&](int i) {
-          bool is_selected = (i == cursor);
-          auto manual_style = _is_manual[i] ? color(Color::Yellow) : nothing;
-          auto base_style = is_selected ? (bgcolor(Color::Blue) | bold | color(Color::White)) : manual_style;
-          
-          return hbox({
-              text(std::to_string(i) + ":00") | size(WIDTH, EQUAL, 6) | center | border,
-              text(std::to_string((int)_strategy._requests[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
-              text(std::to_string((int)_strategy._flex[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
-          });
-      };
+        auto header_legend = hbox({
+            filler(),
+            hbox({
+                text(" HOUR ") | size(WIDTH, EQUAL, 6) | center | border,
+                separator(),
+                text(" POW ") | size(WIDTH, EQUAL, 10) | center | border,
+                separator(),
+                text(" FLEX ") | size(WIDTH, EQUAL, 10) | center | border,
+            }) | bold | color(Color::Yellow),
+            filler(),
+        });
 
-      Elements left_col, right_col;
-      for (int i = 0; i < 12; ++i) left_col.push_back(make_row(i));
-      for (int i = 12; i < 24; ++i) right_col.push_back(make_row(i));
+        auto make_row = [&](int i) {
+            bool is_past = (i < current_hour);
+            bool is_selected = (i == cursor && !is_past);
+            
+            Element row_content;
+            
+            if (is_past) {
+                auto past_style = color(Color::GrayDark);
+                return hbox({
+                    text(to_string(i) + ":00") | size(WIDTH, EQUAL, 6) | center | dim,
+                    separator() | dim,
+                    text(to_string((int)_strategy._requests[i])) | size(WIDTH, EQUAL, 10) | center | past_style,
+                    separator() | dim,
+                    text(to_string((int)_strategy._flex[i])) | size(WIDTH, EQUAL, 10) | center | past_style,
+                }) | border | dim;
+            } else {
+                auto manual_style = _is_manual[i] ? color(Color::Yellow) : nothing;
+                auto base_style = is_selected ? (bgcolor(Color::Blue) | bold | color(Color::White)) : manual_style;
+                
+                return hbox({
+                    text(to_string(i) + ":00") | size(WIDTH, EQUAL, 6) | center | border,
+                    text(to_string((int)_strategy._requests[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
+                    text(to_string((int)_strategy._flex[i])) | size(WIDTH, EQUAL, 10) | center | border | base_style,
+                });
+            }
+        };
 
-      auto table_layout = hbox({
-          filler(),
-          vbox(std::move(left_col)),
-          separator(),
-          vbox(std::move(right_col)),
-          filler(),
-      });
+        Elements left_col, right_col;
+        for (int i = 0; i < 12; ++i) left_col.push_back(make_row(i));
+        for (int i = 12; i < 24; ++i) right_col.push_back(make_row(i));
+
+        auto table_layout = hbox({
+            filler(),
+            vbox(move(left_col)),
+            separator(),
+            vbox(move(right_col)),
+            filler(),
+        });
 
         Element footer;
         if (is_editing_power || is_editing_flex) {
-            std::string pmt = is_editing_power ? " EDIT POWER [" : " EDIT FLEX [";
-            pmt += std::to_string(cursor) + ":00]: ";
+            string pmt = is_editing_power ? " EDIT POWER [" : " EDIT FLEX [";
+            pmt += to_string(cursor) + ":00]: ";
             footer = hbox({
                 text(pmt) | bold | color(Color::Cyan),
                 text(input_buffer) | color(Color::White) | inverted | blink,
@@ -279,28 +306,28 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
         }
 
         return vbox({
-        text(" PLANNER INTERFACE ") | center | bold | borderDouble, header_legend, table_layout | flex, footer
+            text(" PLANNER INTERFACE ") | center | bold | borderDouble,
+            header_legend,
+            table_layout | flex,
+            footer
         }) | border;
     });
 
     auto component = CatchEvent(renderer, [&](Event event) {
-        
+        int current_hour = get_now_hour();
+
         if (is_editing_power || is_editing_flex) {
             if (event == Event::Return) {
                 double val = 0.0;
-                
-                // Logica di acquisizione valore
-                if (input_buffer.empty() && cursor > 0) {
+                if (input_buffer.empty() && cursor > current_hour) {
                     val = is_editing_power ? _strategy._requests[cursor-1] : _strategy._flex[cursor-1];
                 } else if (!input_buffer.empty()) {
-                    try { val = std::stod(input_buffer); } catch(...) { return true; }
+                    try { val = stod(input_buffer); } catch(...) { return true; }
                 }
 
                 lock_guard<mutex> lock(_data_mutex);
-
                 if (is_editing_power) _strategy._requests[cursor] = val;
                 else _strategy._flex[cursor] = val;
-                
                 _is_manual[cursor] = true; 
                 _noise = false; 
                 for (int i = cursor + 1; i < 24; ++i) {
@@ -308,7 +335,6 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
                     if (is_editing_power) _strategy._requests[i] = val;
                     else _strategy._flex[i] = val;
                 }
-
                 is_editing_power = is_editing_flex = false;
                 input_buffer = "";
                 return true;
@@ -327,10 +353,23 @@ void Socialist::run_planner_ui(std::atomic<bool>& global_running) {
             screen.ExitLoopClosure()(); 
             return true; 
         }
-        if (event == Event::ArrowUp)    { cursor = std::max(0, cursor - 1); return true; }
-        if (event == Event::ArrowDown)  { cursor = std::min(23, cursor + 1); return true; }
-        if (event == Event::ArrowRight) { if (cursor < 12) cursor = std::min(23, cursor + 12); return true; }
-        if (event == Event::ArrowLeft)  { if (cursor >= 12) cursor -= 12; return true; }
+
+        if (event == Event::ArrowUp) { 
+            cursor = max(current_hour, cursor - 1); 
+            return true; 
+        }
+        if (event == Event::ArrowDown) { 
+            cursor = min(23, cursor + 1); 
+            return true; 
+        }
+        if (event == Event::ArrowRight) { 
+            if (cursor < 12) cursor = min(23, max(current_hour, cursor + 12)); 
+            return true; 
+        }
+        if (event == Event::ArrowLeft) { 
+            if (cursor >= 12) cursor = max(current_hour, cursor - 12); 
+            return true; 
+        }
         
         if (event == Event::Character('e')) { is_editing_power = true; input_buffer = ""; return true; }
         if (event == Event::Character('f')) { is_editing_flex = true; input_buffer = ""; return true; }

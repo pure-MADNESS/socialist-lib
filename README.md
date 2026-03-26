@@ -68,5 +68,9 @@ add_plugin(<agentname> LIBS Eigen3::Eigen socialist <otherlibraries> SRCS ${SRC_
 ```
 
 ## Usage
+The Terminal User Interface (TUI) is dispayed as follow:
+![alt text](image.png)
+
+As indicated, it is possibile to move along the feasible time slots and on each one of them it is possible to set the required power (Watt), with its flexibility and slots duration (that corresponds to hours duration).
 
 ### Initialization

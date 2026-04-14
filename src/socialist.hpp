@@ -40,6 +40,7 @@ struct Strategy{
   vector<double> _requests;
   vector<double> _flex;
   vector<int> _durations;
+  vector<int> _nominal_hours;
   steady_clock::time_point _last_active; 
 };
 
@@ -55,8 +56,11 @@ class Socialist{
     Socialist() : _gen(_rd()), _dis(0.1, 0.9) {
       _strategy._requests.assign(HOURS, 0.0);
       _strategy._flex.assign(HOURS, 0.0);
+      _strategy._durations.assign(HOURS, 1);
       _tot_powers.assign(HOURS, 0.0);
       _residuals.assign(HOURS, 0.0);
+      _strategy._nominal_hours.assign(HOURS, 0);
+      for(int i=0; i<HOURS; ++i) _strategy._nominal_hours[i] = i;
     }
     
     ~Socialist() {};
@@ -74,6 +78,7 @@ class Socialist{
     void pop_totalPowers(); 
     void pop_totalRequest();
     void compute_residuals();
+    void handle_day_rollover();
 
     double get_current_request();
     vector<double> get_all_requests() const {
@@ -118,6 +123,8 @@ class Socialist{
     double _current_request = 0.0;
 
     mutex _data_mutex;
+
+    int _last_day = -1;
 };
 
 

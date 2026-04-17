@@ -182,14 +182,14 @@ void Socialist::update_strategy() {
             _strategy._requests[h + k] = 500;
           }
           
-          _strategy._flex[h + k] = 0;
+          _strategy._flex[h + k] = min(_strategy._flex[h + k],f_val);
           _strategy._durations[h + k] = 1;
           _strategy._nominal_hours[h + k] = h + k; // reset nominal
         }
 
         for (int k = 0; k < duration; k++) {
           _strategy._requests[best_start_hour + k] += p_val;
-          _strategy._flex[best_start_hour + k] += f_val;
+          _strategy._flex[best_start_hour + k] = min(_strategy._flex[best_start_hour + k], f_val);
           _strategy._durations[best_start_hour + k] = (k == 0) ? d_val : 0;
           _strategy._nominal_hours[best_start_hour + k] = nominal_val; // keep the anchor to starting nominal hour
         }

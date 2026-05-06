@@ -35,7 +35,7 @@ using namespace std;
 using json = nlohmann::json;
 using namespace chrono;
 
-struct Task {
+struct TaskSlot {
     double p;
     double f;
     int d;
@@ -45,7 +45,7 @@ struct Task {
 };
 
 struct Strategy {
-    vector<Task> _taskList;
+    vector<TaskSlot> _taskList;
     vector<double> _requests;
     vector<double> _flex;    
     vector<int> _durations;  

@@ -345,7 +345,7 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
         if (is_editing_dur) {
           int dur = max(1, min(24 - cursor, (int)val));
 
-          Task newTask;
+          TaskSlot newTask;
           newTask.p = _strategy._requests[cursor];
           newTask.f = _strategy._flex[cursor];
           newTask.d = dur;

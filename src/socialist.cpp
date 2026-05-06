@@ -106,25 +106,23 @@ void Socialist::update_strategy() {
   int current_hour = local_tm.tm_hour;
   int search_limit = current_hour + 1;
 
-  struct TempTask { double p; double f; int d; int nom; int current_h; };
-  vector<TempTask> to_optimize;
+  struct TempTask { double p; double f; int d; int nom; int id; int current_h; };
+  map<int, TempTask> tasks_to_optimize;
 
   for (int h = 0; h < HOURS; h++) {
-    if (_strategy._durations[h] > 0 && _strategy._requests[h] > 0) {
-      to_optimize.push_back({
-        _strategy._requests[h], 
-        _strategy._flex[h], 
-        _strategy._durations[h], 
-        _strategy._nominal_hours[h],
-        h 
-      });
+    int id = _strategy._task_ids[h];
+    if (id > 0 && _strategy._durations[h] > 0) {
+      tasks_to_optimize[id] = {
+        _strategy._requests[h], _strategy._flex[h], _strategy._durations[h],
+        _strategy._nominal_hours[h], id, h
+      };
       h += (_strategy._durations[h] - 1);
     }
   }
 
   _strategy._requests.assign(HOURS, 0.0);
   _strategy._durations.assign(HOURS, 0);
-  _strategy._flex.assign(HOURS, 0.0);
+  _strategy._task_ids.assign(HOURS, 0);
 
   pop_totalPowers(); 
   _residuals.assign(HOURS, 0.0);
@@ -132,7 +130,7 @@ void Socialist::update_strategy() {
     for (int i = 0; i < HOURS; ++i) _residuals[i] += strategy._requests[i];
   }
   compute_residuals();
-  for (auto& t : to_optimize) {
+for (auto& [id, t] : tasks_to_optimize) {
     int best_start = t.current_h;
     
     if (t.current_h > search_limit) {
@@ -164,9 +162,10 @@ void Socialist::update_strategy() {
       int idx = best_start + k;
       if (idx >= HOURS) break;
       
-      _strategy._requests[idx] += t.p; 
+      _strategy._requests[idx] += t.p;
       _strategy._flex[idx] = t.f;
       _strategy._nominal_hours[idx] = t.nom;
+      _strategy._task_ids[idx] = t.id;
       _strategy._durations[idx] = (k == 0) ? t.d : 0;
     }
     
@@ -351,11 +350,14 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
         if (is_editing_dur) {
           int dur = max(1, min(24 - cursor, (int)val));
           _strategy._durations[cursor] = dur;
+          int new_id = cursor + 1;
+
           for (int j = 1; j < dur; ++j) {
             _strategy._requests[cursor + j] = _strategy._requests[cursor];
             _strategy._flex[cursor + j] = _strategy._flex[cursor];
             _strategy._durations[cursor + j] = 0;
             _strategy._nominal_hours[cursor + j] = cursor;
+            _strategy._task_ids[cursor + j] = new_id;
             _is_manual[cursor + j] = true;
           }
 

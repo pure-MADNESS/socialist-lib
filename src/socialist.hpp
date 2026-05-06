@@ -41,6 +41,7 @@ struct Strategy{
   vector<double> _flex;
   vector<int> _durations;
   vector<int> _nominal_hours;
+  vector<int> _task_ids;
   steady_clock::time_point _last_active; 
 };
 
@@ -60,6 +61,7 @@ class Socialist{
       _tot_powers.assign(HOURS, 0.0);
       _residuals.assign(HOURS, 0.0);
       _strategy._nominal_hours.assign(HOURS, 0);
+      _strategy._task_ids.assign(HOURS, 0);
       for(int i=0; i<HOURS; ++i) _strategy._nominal_hours[i] = i;
     }
     

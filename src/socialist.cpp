@@ -57,6 +57,25 @@ void Socialist::listen(json const &input, string topic) {
   }
 }
 
+void Socialist::sync_tasks_to_vectors() {
+    _strategy._requests.assign(HOURS, 0.0);
+    _strategy._flex.assign(HOURS, 0.0);
+    _strategy._durations.assign(HOURS, 0);
+    _strategy._nominal_hours.assign(HOURS, 0);
+
+    for (const auto& t : _strategy._taskList) {
+        for (int k = 0; k < t.d; k++) {
+            int idx = t.start + k;
+            if (idx >= HOURS) break;
+
+            _strategy._requests[idx] += t.p;
+            _strategy._flex[idx] = t.f;
+            _strategy._nominal_hours[idx] = t.nom;
+            _strategy._durations[idx] = (k == 0) ? t.d : 0;
+        }
+    }
+}
+
 void Socialist::pop_totalPowers() {
 
     _tot_powers.assign(24, 0.0);  // Svuoto per sicurezza
@@ -97,84 +116,60 @@ void Socialist::handle_day_rollover() {
     _powers.clear();
 }
 
+
 void Socialist::update_strategy() {
   lock_guard<mutex> lock(_data_mutex);
 
-  auto now_time_t = chrono::system_clock::to_time_t(chrono::system_clock::now());
-  tm local_tm;
-  localtime_r(&now_time_t, &local_tm);
-  int current_hour = local_tm.tm_hour;
+  auto now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+  int current_hour = localtime(&now)->tm_hour;
   int search_limit = current_hour + 1;
-
-  struct TempTask { double p; double f; int d; int nom; int id; int current_h; };
-  map<int, TempTask> tasks_to_optimize;
-
-  for (int h = 0; h < HOURS; h++) {
-    int id = _strategy._task_ids[h];
-    if (id > 0 && _strategy._durations[h] > 0) {
-      tasks_to_optimize[id] = {
-        _strategy._requests[h], _strategy._flex[h], _strategy._durations[h],
-        _strategy._nominal_hours[h], id, h
-      };
-      h += (_strategy._durations[h] - 1);
-    }
-  }
-
-  _strategy._requests.assign(HOURS, 0.0);
-  _strategy._durations.assign(HOURS, 0);
-  _strategy._task_ids.assign(HOURS, 0);
 
   pop_totalPowers(); 
   _residuals.assign(HOURS, 0.0);
-  for (const auto& [name, strategy] : _neighbours) {
-    for (int i = 0; i < HOURS; ++i) _residuals[i] += strategy._requests[i];
+  for (const auto& [name, s] : _neighbours) {
+    for (int i = 0; i < HOURS; ++i) _residuals[i] += s._requests[i];
   }
   compute_residuals();
-for (auto& [id, t] : tasks_to_optimize) {
-    int best_start = t.current_h;
-    
-    if (t.current_h > search_limit) {
-      double max_neighbor_flex = 0;
-      for (auto const& [name, s] : _neighbours) {
-        for (int k = 0; k < t.d && (t.current_h + k) < HOURS; k++) {
-          max_neighbor_flex = max(max_neighbor_flex, s._flex[t.current_h + k]);
-        }
-      }
 
-      if (t.f > max_neighbor_flex) {
-        int start_search = max(search_limit + 1, t.nom - (int)t.f);
-        int end_search = min(HOURS - t.d, t.nom + (int)t.f);
-        
-        double best_score = -1e9;
-        for (int nh = start_search; nh <= end_search; nh++) {
-          double score = 0;
-          for (int k = 0; k < t.d; k++) score += _residuals[nh + k];
-          
-          if (score > best_score) {
-            best_score = score;
-            best_start = nh;
-          }
-        }
+  for (auto& t : _strategy._taskList) {
+    if (t.start <= search_limit) {
+        for(int k=0; k<t.d && (t.start+k)<HOURS; k++) _residuals[t.start+k] -= t.p;
+        continue;
+    }
+
+    double max_neighbor_flex = 0;
+    for (auto const& [name, s] : _neighbours) {
+      for (int k = 0; k < t.d && (t.start + k) < HOURS; k++) {
+        max_neighbor_flex = max(max_neighbor_flex, s._flex[t.start + k]);
       }
     }
 
-    for (int k = 0; k < t.d; k++) {
-      int idx = best_start + k;
-      if (idx >= HOURS) break;
+    if (t.f > max_neighbor_flex) {
+      int start_search = max(search_limit + 1, t.nom - (int)t.f);
+      int end_search = min(HOURS - t.d, t.nom + (int)t.f);
       
-      _strategy._requests[idx] += t.p;
-      _strategy._flex[idx] = t.f;
-      _strategy._nominal_hours[idx] = t.nom;
-      _strategy._task_ids[idx] = t.id;
-      _strategy._durations[idx] = (k == 0) ? t.d : 0;
+      int best_start = t.start;
+      double best_score = -1e9;
+
+      for (int nh = start_search; nh <= end_search; nh++) {
+        double score = 0;
+        for (int k = 0; k < t.d; k++) score += _residuals[nh + k];
+        
+        if (score > best_score) {
+          best_score = score;
+          best_start = nh;
+        }
+      }
+      t.start = best_start;
     }
-    
-    for (int k = 0; k < t.d; k++) {
-        if (best_start + k < HOURS) _residuals[best_start + k] -= t.p;
-    }
+
+    for(int k=0; k<t.d && (t.start+k)<HOURS; k++) _residuals[t.start+k] -= t.p;
   }
+
+  sync_tasks_to_vectors();
   _strategy._last_active = steady_clock::now();
 }
+
 
 double Socialist::get_current_request(){
 
@@ -349,18 +344,20 @@ void Socialist::run_planner_ui(atomic<bool>& global_running) {
 
         if (is_editing_dur) {
           int dur = max(1, min(24 - cursor, (int)val));
-          _strategy._durations[cursor] = dur;
-          int new_id = cursor + 1;
 
-          for (int j = 1; j < dur; ++j) {
-            _strategy._requests[cursor + j] = _strategy._requests[cursor];
-            _strategy._flex[cursor + j] = _strategy._flex[cursor];
-            _strategy._durations[cursor + j] = 0;
-            _strategy._nominal_hours[cursor + j] = cursor;
-            _strategy._task_ids[cursor + j] = new_id;
-            _is_manual[cursor + j] = true;
-          }
+          Task newTask;
+          newTask.p = _strategy._requests[cursor];
+          newTask.f = _strategy._flex[cursor];
+          newTask.d = dur;
+          newTask.nom = cursor;
+          newTask.start = cursor;
+          newTask.id = cursor + 100;
 
+          _strategy._taskList.push_back(newTask);
+          _is_manual[cursor] = true;
+          _noise = false;
+
+          sync_tasks_to_vectors();
         } else {
 
           if (is_editing_power) _strategy._requests[cursor] = val;

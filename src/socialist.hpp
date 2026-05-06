@@ -35,14 +35,22 @@ using namespace std;
 using json = nlohmann::json;
 using namespace chrono;
 
-struct Strategy{
+struct Task {
+    double p;
+    double f;
+    int d;
+    int nom;
+    int start;
+    int id;
+};
 
-  vector<double> _requests;
-  vector<double> _flex;
-  vector<int> _durations;
-  vector<int> _nominal_hours;
-  vector<int> _task_ids;
-  steady_clock::time_point _last_active; 
+struct Strategy {
+    vector<Task> _taskList;
+    vector<double> _requests;
+    vector<double> _flex;    
+    vector<int> _durations;  
+    vector<int> _nominal_hours;
+    steady_clock::time_point _last_active; 
 };
 
 struct FuturePowers{
@@ -61,7 +69,6 @@ class Socialist{
       _tot_powers.assign(HOURS, 0.0);
       _residuals.assign(HOURS, 0.0);
       _strategy._nominal_hours.assign(HOURS, 0);
-      _strategy._task_ids.assign(HOURS, 0);
       for(int i=0; i<HOURS; ++i) _strategy._nominal_hours[i] = i;
     }
     
@@ -81,6 +88,8 @@ class Socialist{
     void pop_totalRequest();
     void compute_residuals();
     void handle_day_rollover();
+
+    void sync_tasks_to_vectors();
 
     double get_current_request();
     vector<double> get_all_requests() const {

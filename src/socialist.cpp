@@ -97,15 +97,13 @@ void Socialist::handle_day_rollover() {
     _powers.clear();
 }
 
-
 void Socialist::update_strategy() {
-
   lock_guard<mutex> lock(_data_mutex);
 
   auto now_time_t = chrono::system_clock::to_time_t(chrono::system_clock::now());
   tm local_tm;
   localtime_r(&now_time_t, &local_tm);
-
+  
   if (_last_day != -1 && local_tm.tm_mday != _last_day) {
         handle_day_rollover();
     }
@@ -116,50 +114,39 @@ void Socialist::update_strategy() {
   compute_residuals();
 
   int current_hour = local_tm.tm_hour;
-  int search_limit = current_hour + 1; // this +1 is due to not shift the task that an user is currently performing, --> margin
+  int search_limit = current_hour + 1;
 
   for (int h = 0; h < HOURS; h++) {
-    
-    // find block
     int duration = _strategy._durations[h];
     
     if (duration < 1 || _strategy._requests[h] <= 0 || h <= search_limit) {
         continue; 
     }
 
-    // check flexibility = check starting hour h (task of the same hours interval has the same flexibility)
     double my_flex = _strategy._flex[h];
     double max_neighbor_flex = 0;
     for (auto const& [name, s] : _neighbours) {
-      // check neighbor flexibility
       for (int k = 0; k < duration && (h + k) < HOURS; k++) {
         max_neighbor_flex = max(max_neighbor_flex, s._flex[h + k]);
       }
     }
 
-    // if the current instance is the more flexible, then find a new slot
     if (my_flex > max_neighbor_flex) {
-      int nominal_h = _strategy._nominal_hours[h];
+      int nominal_origin = _strategy._nominal_hours[h];
       int window = (int)my_flex;
-      int start_search = max(search_limit + 1, nominal_h - window);
-      int end_search = min(HOURS - duration, nominal_h + window);
+      int start_search = max(search_limit + 1, nominal_origin - window);
+      int end_search = min(HOURS - duration, nominal_origin + window);
 
       int best_start_hour = h;
       double best_score = -1e9;
 
       double current_block_score = 0;
-      for (int k = 0; k < duration; k++){
-        current_block_score += _residuals[h + k];
-      }
-
+      for (int k = 0; k < duration; k++) current_block_score += _residuals[h + k];
       best_score = current_block_score;
 
-      // check a valid window/interval that has the better margin
       for (int nh = start_search; nh <= end_search; nh++) {
         double total_nh_score = 0;
-        for (int k = 0; k < duration; k++) {
-          total_nh_score += _residuals[nh + k];
-        }
+        for (int k = 0; k < duration; k++) total_nh_score += _residuals[nh + k];
 
         if (total_nh_score > best_score) {
           best_score = total_nh_score;
@@ -167,40 +154,35 @@ void Socialist::update_strategy() {
         }
       }
 
-      // shift
       if (best_start_hour != h) {
         double p_val = _strategy._requests[h];
         double f_val = _strategy._flex[h];
         int d_val = _strategy._durations[h];
-        int nominal_val = _strategy._nominal_hours[h];
+        int n_val = _strategy._nominal_hours[h];
 
         for (int k = 0; k < duration; k++) {
           _strategy._requests[h + k] -= p_val;
-        
-          if(_strategy._requests[h + k] <= 0){
-
-            _strategy._requests[h + k] = 500;
+          if (_strategy._requests[h + k] < 0.1) { 
+              _strategy._requests[h + k] = 0;
+              _strategy._durations[h + k] = 0;
+              _strategy._flex[h + k] = 0;
+              _strategy._nominal_hours[h + k] = 0;
           }
-          
-          _strategy._flex[h + k] = min(_strategy._flex[h + k],f_val);
-          _strategy._durations[h + k] = 1;
-          _strategy._nominal_hours[h + k] = h + k; // reset nominal
         }
 
         for (int k = 0; k < duration; k++) {
           _strategy._requests[best_start_hour + k] += p_val;
-          _strategy._flex[best_start_hour + k] = min(_strategy._flex[best_start_hour + k], f_val);
+          _strategy._flex[best_start_hour + k] = f_val;
+          _strategy._nominal_hours[best_start_hour + k] = n_val;
           _strategy._durations[best_start_hour + k] = (k == 0) ? d_val : 0;
-          _strategy._nominal_hours[best_start_hour + k] = nominal_val; // keep the anchor to starting nominal hour
         }
         
         _strategy._last_active = steady_clock::now();
-        h = max(h, best_start_hour + duration - 1); 
       }
     }
+    h += (duration - 1); 
   }
 }
-
 
 double Socialist::get_current_request(){
 

@@ -103,85 +103,78 @@ void Socialist::update_strategy() {
   auto now_time_t = chrono::system_clock::to_time_t(chrono::system_clock::now());
   tm local_tm;
   localtime_r(&now_time_t, &local_tm);
-  
-  if (_last_day != -1 && local_tm.tm_mday != _last_day) {
-        handle_day_rollover();
-    }
-  _last_day = local_tm.tm_mday;
-
-  pop_totalPowers(); 
-  pop_totalRequest(); 
-  compute_residuals();
-
   int current_hour = local_tm.tm_hour;
   int search_limit = current_hour + 1;
 
+  struct TempTask { double p; double f; int d; int nom; int current_h; };
+  vector<TempTask> to_optimize;
+
   for (int h = 0; h < HOURS; h++) {
-    int duration = _strategy._durations[h];
+    if (_strategy._durations[h] > 0 && _strategy._requests[h] > 0) {
+      to_optimize.push_back({
+        _strategy._requests[h], 
+        _strategy._flex[h], 
+        _strategy._durations[h], 
+        _strategy._nominal_hours[h],
+        h 
+      });
+      h += (_strategy._durations[h] - 1);
+    }
+  }
+
+  _strategy._requests.assign(HOURS, 0.0);
+  _strategy._durations.assign(HOURS, 0);
+  _strategy._flex.assign(HOURS, 0.0);
+
+  pop_totalPowers(); 
+  _residuals.assign(HOURS, 0.0);
+  for (const auto& [name, strategy] : _neighbours) {
+    for (int i = 0; i < HOURS; ++i) _residuals[i] += strategy._requests[i];
+  }
+  compute_residuals();
+  for (auto& t : to_optimize) {
+    int best_start = t.current_h;
     
-    if (duration < 1 || _strategy._requests[h] <= 0 || h <= search_limit) {
-        continue; 
-    }
-
-    double my_flex = _strategy._flex[h];
-    double max_neighbor_flex = 0;
-    for (auto const& [name, s] : _neighbours) {
-      for (int k = 0; k < duration && (h + k) < HOURS; k++) {
-        max_neighbor_flex = max(max_neighbor_flex, s._flex[h + k]);
-      }
-    }
-
-    if (my_flex > max_neighbor_flex) {
-      int nominal_origin = _strategy._nominal_hours[h];
-      int window = (int)my_flex;
-      int start_search = max(search_limit + 1, nominal_origin - window);
-      int end_search = min(HOURS - duration, nominal_origin + window);
-
-      int best_start_hour = h;
-      double best_score = -1e9;
-
-      double current_block_score = 0;
-      for (int k = 0; k < duration; k++) current_block_score += _residuals[h + k];
-      best_score = current_block_score;
-
-      for (int nh = start_search; nh <= end_search; nh++) {
-        double total_nh_score = 0;
-        for (int k = 0; k < duration; k++) total_nh_score += _residuals[nh + k];
-
-        if (total_nh_score > best_score) {
-          best_score = total_nh_score;
-          best_start_hour = nh;
+    if (t.current_h > search_limit) {
+      double max_neighbor_flex = 0;
+      for (auto const& [name, s] : _neighbours) {
+        for (int k = 0; k < t.d && (t.current_h + k) < HOURS; k++) {
+          max_neighbor_flex = max(max_neighbor_flex, s._flex[t.current_h + k]);
         }
       }
 
-      if (best_start_hour != h) {
-        double p_val = _strategy._requests[h];
-        double f_val = _strategy._flex[h];
-        int d_val = _strategy._durations[h];
-        int n_val = _strategy._nominal_hours[h];
-
-        for (int k = 0; k < duration; k++) {
-          _strategy._requests[h + k] -= p_val;
-          if (_strategy._requests[h + k] < 0.1) { 
-              _strategy._requests[h + k] = 0;
-              _strategy._durations[h + k] = 0;
-              _strategy._flex[h + k] = 0;
-              _strategy._nominal_hours[h + k] = 0;
+      if (t.f > max_neighbor_flex) {
+        int start_search = max(search_limit + 1, t.nom - (int)t.f);
+        int end_search = min(HOURS - t.d, t.nom + (int)t.f);
+        
+        double best_score = -1e9;
+        for (int nh = start_search; nh <= end_search; nh++) {
+          double score = 0;
+          for (int k = 0; k < t.d; k++) score += _residuals[nh + k];
+          
+          if (score > best_score) {
+            best_score = score;
+            best_start = nh;
           }
         }
-
-        for (int k = 0; k < duration; k++) {
-          _strategy._requests[best_start_hour + k] += p_val;
-          _strategy._flex[best_start_hour + k] = f_val;
-          _strategy._nominal_hours[best_start_hour + k] = n_val;
-          _strategy._durations[best_start_hour + k] = (k == 0) ? d_val : 0;
-        }
-        
-        _strategy._last_active = steady_clock::now();
       }
     }
-    h += (duration - 1); 
+
+    for (int k = 0; k < t.d; k++) {
+      int idx = best_start + k;
+      if (idx >= HOURS) break;
+      
+      _strategy._requests[idx] += t.p; 
+      _strategy._flex[idx] = t.f;
+      _strategy._nominal_hours[idx] = t.nom;
+      _strategy._durations[idx] = (k == 0) ? t.d : 0;
+    }
+    
+    for (int k = 0; k < t.d; k++) {
+        if (best_start + k < HOURS) _residuals[best_start + k] -= t.p;
+    }
   }
+  _strategy._last_active = steady_clock::now();
 }
 
 double Socialist::get_current_request(){
